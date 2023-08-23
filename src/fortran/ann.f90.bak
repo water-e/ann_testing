@@ -118,7 +118,6 @@ contains
     use fnet_CVP_intake
     use fnet_X2
     use fnet_beldan
-    use fnet_MTZ	
     
     real, dimension(118), intent(in) :: sac,sjr,export,dxc,currSFtide, DICU, VernEC
     real, dimension(118) :: NDO, GEC,g !shengjun add 8/5/2004
@@ -226,11 +225,8 @@ contains
     else if (location == 20) then ! Belden landing
        call fnet_beldan_engine(inarray,outarray,ANNengineStatus)
        calcdaily =(outarray(1)-beldan_offset)/beldan_scale;                
-    else if (location == 21) then ! Martinez NJ 9/16/2020
-       call fnet_MTZ_engine(inarray,outarray,ANNengineStatus)
-       calcdaily =(outarray(1)-MTZ_offset)/MTZ_scale;                
-    else       
-       print *, "Wrong EC station specified. ", location
+    else
+       print *, "Wrong EC station specified."
        stop   
     end if
         
@@ -321,7 +317,7 @@ contains
         
 	
         EXP_SCALE = 0.00000293; EXP_OFFSET = 0.09318458;     ! Delta_outflow
-		SAC_SCALE = 0.80000000; SAC_OFFSET = 0.10000000;    ! X2_31day_prv
+	    SAC_SCALE = $1(x2_31day_prv); SAC_OFFSET = $2(x2_31day_prv);    ! X2_31day_prv
 	   
     end if
     !end of add         

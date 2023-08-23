@@ -5,12 +5,16 @@ FUNCTION ANN_x2(X2_prv0,X2_prv1,X2_prv2,X2_prv3,X2_prv4, &
     !flowFromSac: the northern flow but without Sac flow: Yolo-NB-Valleyjo
     !flow_inDelta: SJR+east+Calver
     !DO: delta outflow
-                  
+    
+    !DEC$ ATTRIBUTES DLLEXPORT :: ANN_X2
+    
+    USE, INTRINSIC :: ISO_C_BINDING
+    
     REAL,INTENT(IN)    ::  X2_prv0,X2_prv1,X2_prv2,X2_prv3,X2_prv4, &
                            DO_prv0,DO_prv1,DO_prv2,DO_prv3,DO_prv4
 
-    integer, INTENT(IN) :: currMonth, currYear,mon0,mon1,mon2,mon3,mon4,ave_type
-    integer, optional, intent(in) :: BeginDay, EndDay !only used in ave_type ==10
+    integer(C_LONG), INTENT(IN) :: currMonth, currYear,mon0,mon1,mon2,mon3,mon4,ave_type
+    integer(C_LONG), optional, intent(in) :: BeginDay, EndDay !only used in ave_type ==10
       
     REAL    :: outputX2 
     
@@ -37,14 +41,18 @@ FUNCTION getNDO_x2( X2, &
      mon0,mon1,mon2,mon3,mon4,ave_type,currMonth,currYear,BeginDay, EndDay)  RESULT (requiredNDO) 
     !** returning the required current monthly NDO to obtain a desired X2.
     !DO: delta outflow
-                  
+    
+    USE, INTRINSIC :: ISO_C_BINDING
+    
+    !DEC$ ATTRIBUTES DLLEXPORT :: getNDO_x2
+    
     REAL,INTENT(IN)    ::  X2, &
             X2_prv0,X2_prv1,X2_prv2,X2_prv3,X2_prv4, & 
             DO_prv0,DO_prv1,DO_prv2,DO_prv3 
 
-    integer, INTENT(IN) :: currMonth, currYear,mon0,mon1,mon2,mon3,mon4,ave_type
+    integer(C_LONG), INTENT(IN) :: currMonth, currYear,mon0,mon1,mon2,mon3,mon4,ave_type
         
-    integer, optional, intent(in) :: BeginDay, EndDay !only used in ave_type ==10
+    integer(C_LONG), optional, intent(in) :: BeginDay, EndDay !only used in ave_type ==10
       
     REAL   :: requiredNDO
     
@@ -152,13 +160,17 @@ FUNCTION ANN_x2_curMonInpSplit( &
     ! mon4_1 and mon4_2 are the number of days in mon4 which the input of Qsac_prv4_1,Qsac_prv4_2 
     ! are applicable to these two periods respectively. It holds true for all input: Qexp_prv4_1,Qexp_prv4_2, etc,..
     ! condition: mon4_1+mon4_2 <=mon4
-                  
+    
+    USE, INTRINSIC :: ISO_C_BINDING
+    
+    !DEC$ ATTRIBUTES DLLEXPORT :: ANN_x2_curMonInpSplit
+    
     REAL,INTENT(IN)    ::  &
      X2_prv0,X2_prv1,X2_prv2,X2_prv3,X2_prv4, & 
      DO_prv0,DO_prv1,DO_prv2,DO_prv3,DO_prv4,DO_prv4_1,DO_prv4_2  
      
-    integer, INTENT(IN) :: currMonth, currYear,mon0,mon1,mon2,mon3,mon4,mon4_1,mon4_2,ave_type
-    integer, optional, intent(in) :: BeginDay, EndDay !only used in ave_type ==10
+    integer(C_LONG), INTENT(IN) :: currMonth, currYear,mon0,mon1,mon2,mon3,mon4,mon4_1,mon4_2,ave_type
+    integer(C_LONG), optional, intent(in) :: BeginDay, EndDay !only used in ave_type ==10
       
     REAL    :: outputX2 
     
@@ -188,7 +200,9 @@ FUNCTION getNDO_x2_curMonNDOSplit( X2, &
     !DO_prv4_1 and DO_prv4_2 are the first 2 periods (mon4_1 and mon4_2) of NDOs in the current month
     !mon4_1 and mon4_2 are the number of days in the current month whose NDO flows are DO_prv4_1 and DO_prv4_2 respectively
     !mon4_1 + mon4_2 <= mon4
-                  
+    
+    !DEC$ ATTRIBUTES DLLEXPORT :: getNDO_x2_curMonNDOSplit
+    
     REAL,INTENT(IN)    ::  X2, &
      X2_prv0,X2_prv1,X2_prv2,X2_prv3,X2_prv4, & 
      DO_prv0,DO_prv1,DO_prv2,DO_prv3,DO_prv4_1,DO_prv4_2  

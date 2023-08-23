@@ -1,0 +1,57 @@
+useDefaultSigma:    1
+layers:8 3 1
+layerTypes:logsig logsig purelin
+trainFunction:newff
+lowScale: 0.10
+highScale: 0.90
+memoryDays:    7
+lengthOfAverage:   11
+memoryAverages:   10
+blockMemory:    0
+percentCal: 0.80
+percentVal: 0.20
+
+
+Input data range:
+
+Loading data for: 82yr_new_tide
+                       DO Min:    2618.32; Max:  275710.91
+              X2_31dayprv Min:      47.13; Max:     101.74
+     SF_AstroPlanningTide Min:       3.12; Max:       9.15
+
+
+Input Scaling factors:
+
+            Delta_outflow: a=0.00000293; b=  0.09232986;
+
+             X2_31day_prv: a=0.01465058; b= -0.59048580;
+
+    SF_Astro_PlanningTide: a=0.13267658; b= -0.31441527;
+
+
+Output Scaling factors:
+
+ X2: 
+
+ D:\delta\dsm2_v81\CalSim3ANN\82yr_new_tide\output_withX2infoOut\x2_daily.dss: 
+
+ min=47.13026428, max=101.73560333
+
+ a=0.01465058; b= -0.59048580;
+
+
+Input data range:
+
+Loading data for: 82yr_new_tide
+                       DO Min:    2618.32; Max:  275710.91
+              X2_31dayprv Min:      47.13; Max:     101.74
+     SF_AstroPlanningTide Min:       3.12; Max:       9.15
+
+
+Input Scaling factors:
+
+            Delta_outflow: a=0.00000293; b=  0.09232986;
+
+             X2_31day_prv: a=0.01465058; b= -0.59048580;
+
+    SF_Astro_PlanningTide: a=0.13267658; b= -0.31441527;

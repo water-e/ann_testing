@@ -9,7 +9,7 @@
 !   3 = Emmaton
 !   4 = Antiock
 !   5 = Collinsville
-!   6 = Mallard (Chipps Island)- beldan NJ 9/08/2020 
+!   6 = Mallard (Chipps Island)
 
 ! VARIABLE KEY:
 !   1 = Slope
@@ -37,37 +37,24 @@
 !  
 !   the specified export range for linearization is not used if a cone exists in the solution zone
 
-FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
-     Qexp_prv0,Qexp_prv1,Qexp_prv2,Qexp_prv3,&
-     Qsjr_prv0,Qsjr_prv1,Qsjr_prv2,Qsjr_prv3,Qsjr_fut, &
-     DXC_prv0,DXC_prv1,DXC_prv2,DXC_prv3,DXC_fut,&
-     DICU_prv0,DICU_prv1,DICU_prv2,DICU_prv3,DICU_fut,& !shengjun add 2/24/2005     
-     Qsac_oth_prv0,Qsac_oth_prv1,Qsac_oth_prv2,Qsac_oth_prv3,Qsac_oth_fut,&
-     Qexp_oth_prv0,Qexp_oth_prv1,Qexp_oth_prv2,Qexp_oth_prv3,Qexp_oth_fut,&
-     VernEC_prv0,VernEC_prv1,VernEC_prv2,VernEC_prv3,VernEC_fut,&
-     mon0,mon1,mon2,mon3,mon4,&
-     ECTARGET,linear1,linear2,location,variable,ave_type,&
-     currMonth,currYear,ForceOption) RESULT(value)!shengjun 2/15/2005 and 5/11/2005: ForceOption=1: force to create a linear relationship even the designated points in export do not intercept with ECtarget contour
+FUNCTION AnnLineGen_Daily(Qsac_prv, Qexp_prv,&
+     Qsjr_prv,Qsjr_est,&
+     DXC_prv, DXC_est,&
+     DICU_prv,DICU_est,&      
+     Qsac_oth_prv,Qsac_oth_est, &
+     Qexp_oth_prv,Qexp_oth_est, &
+     VernEC_prv,VernEC_est,&
+     ECTARGET,linear1,linear2,location,variable,&
+     currDay,currMonth,currYear,ForceOption) RESULT(value)!shengjun 2/15/2005 and 5/11/2005: ForceOption=1: force to create a linear relationship even the designated points in export do not intercept with ECtarget contour
      
   use SFtideModule !shengjun 2/14/2005
   USE, INTRINSIC :: ISO_C_BINDING
      
   IMPLICIT NONE
   
-  interface 
-    function ConservativeSpline(monthlyInput1,monthlyInput2,monthlyInput3,monthlyInput4,monthlyInput5, &
-                              daysInMonth1,daysInMonth2,daysInMonth3,daysInMonth4,daysInMonth5) result (smoothedOutput)
-      implicit none
-	    integer,INTENT(IN) ::  daysInMonth1,daysInMonth2,daysInMonth3,daysInMonth4,daysInMonth5
-	    REAL,INTENT(IN)    ::  monthlyInput1,monthlyInput2,monthlyInput3,monthlyInput4,monthlyInput5
-	    real, allocatable  ::  smoothedOutput(:)	  
-    end function 	ConservativeSpline
-            
-  end interface
+  !DEC$ ATTRIBUTES DLLEXPORT :: AnnLineGen_Daily
   
-  !DEC$ ATTRIBUTES DLLEXPORT :: AnnLineGen
-  
-  REAL    ::  ANN_Month
+  REAL    ::  ANN_Daily
   integer :: initall
   integer :: getSFtideArrayEndIndex !2/14/2005
   REAL   :: ECMAX,ECMIN,TOL,DIFF,Qmin,Qmax,Qmid,ECmid,x1,x2,y1,y2,slope,intercept,value,point
@@ -81,29 +68,24 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
   
   logical :: debugCode = .false.
   !dimension flow variables for 148 days
-  REAL,DIMENSION(148) :: Qsac,Qexp,Qsjr,DXC,QsacMin,QsacMax,QexpMin,QexpMax,Qsac_oth,Qexp_oth,currSFtide,DICU,VernEC !shengjun & Hao 9/2008 
+  REAL,DIMENSION(148) :: Qsac,Qexp,Qsjr,DXC,QsacMin,QsacMax,QexpMin,QexpMax,Qsac_oth,Qexp_oth,currSFtide,DICU,VernEC, QSacTot, QExpTot !shengjun & Hao 9/2008 
 
-  INTEGER(C_LONG),INTENT(IN) :: location,variable,mon0,mon1,mon2,mon3,mon4,ave_type,currMonth,currYear,ForceOption !Shengjun 2/15/2005
-  INTEGER            :: i,tim0,tim1,tim2,tim3,tim4,tim5, tryNo
+  INTEGER(C_LONG),INTENT(IN) :: location,variable,currDay,currMonth,currYear,ForceOption !Shengjun 2/15/2005
+  INTEGER            :: i, tryNo
   INTEGER            SFtideStartIndex,SFtideEndIndex
   
-  REAL,INTENT(IN)    :: Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qexp_prv0,Qexp_prv1,Qexp_prv2,Qexp_prv3,&
-       Qsjr_prv0,Qsjr_prv1,Qsjr_prv2,Qsjr_prv3,Qsjr_fut, &
-       Qsac_oth_prv0,Qsac_oth_prv1,Qsac_oth_prv2,Qsac_oth_prv3,Qsac_oth_fut,&
-       Qexp_oth_prv0,Qexp_oth_prv1,Qexp_oth_prv2,Qexp_oth_prv3,Qexp_oth_fut,&
-       DICU_prv0,DICU_prv1,DICU_prv2,DICU_prv3,DICU_fut,& !shengjun add 2/24/2005
-       VernEC_prv0,VernEC_prv1,VernEC_prv2,VernEC_prv3,VernEC_fut,& !Hao add 9/2008
-       DXC_prv0,DXC_prv1,DXC_prv2,DXC_prv3,DXC_fut,ECTARGET,linear1,linear2
+  Real, dimension(147), intent(inout) :: Qsac_prv
+  Real, dimension(147), intent(inout) :: Qexp_prv
+  Real, dimension(147), intent(inout) :: Qsjr_prv
+  Real, dimension(147), intent(inout) :: DXC_prv  
+  Real, dimension(147), intent(inout) :: DICU_prv  
+  Real, dimension(147), intent(inout) :: Qsac_oth_prv
+  Real, dimension(147), intent(inout) :: Qexp_oth_prv
+  Real, dimension(147), intent(inout) :: VernEC_prv
+    
+  REAL,INTENT(IN)    :: Qsjr_est, Qsac_oth_est, Qexp_oth_est, DICU_est, VernEC_est, DXC_est,ECTARGET,linear1,linear2
   
-  real, allocatable :: smoothedFlow(:) !4/1/2005  
   real ECtolerance,QSacTolerance,QExpTolerance !4/14/2006: minimum values considerd to be significant
-!!beginchange
-  logical,dimension(0:4) :: VernEC_prv_BW =.false.
-  real   ,dimension(0:4) :: VernEC_prv_V=0
-  integer,dimension(210) :: T=0
-  integer,dimension(0:4) :: tim_beg, tim_end
-  integer :: counter=0, end_time, j
-!!endchange
     
   QExpMinEnforced=900.0; QSacMinimum=5000.0 ! 4826 cfs is the minimum sac flow in training ANN: make sure the solution space with ANN training range
   QExpMaximum=14000.0; QSacMaximum=25000.0 ! 89434 cfs is the maximum sac flow in training ANN
@@ -129,157 +111,50 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
   end if
   
   i=initall()
+
+  do i=1, 147
+        QSac(i)=QSac_prv(i)
+  end do
+
+  do i=1, 147
+        Qexp(i)=QExp_prv(i)
+  end do
+
+  do i=1, 147
+        QSjr(i)=QSjr_prv(i)
+  end do
+  QSjr(148)=QSjr_est
+
+  do i=1, 147
+        QSac_Oth(i)=QSac_Oth_prv(i)
+  end do
+  QSac_Oth(148)=QSac_oth_est
+
+  do i=1, 147
+        QExp_Oth(i)=QExp_Oth_prv(i)
+  end do
+  QExp_Oth(148)=QExp_oth_est
   
-  tim5=148          ! last day of current month
-  tim4=tim5-mon4+1  ! first day of current month
-  tim3=tim4-mon3    ! first day of 1 month ago
-  tim2=tim3-mon2    ! first day of 2 months ago
-  tim1=tim2-mon1    ! first day of 3 months ago
-  tim0=1            ! first day of second half of 4 months ago 
-
-  ! 118 values daily are needed to estimate one daily value of EC
-  ! this function builds the first set of input arrays representing
-  ! dxc position and river inflow.
-  !
-  ! The arrays have the following structure
-  ! tim0         tim1         tim2         tim3           tim4         tim5
-  ! --------------------------------------------------------------------
-  ! |this month-4|this month-3|this month-2| this month-1 | this month |
-  ! --------------------------------------------------------------------
-
-  if(.not. allocated(smoothedFlow)) then !shengjun 4/25/2005
-    allocate (smoothedFlow(mon0+mon1+mon2+mon3+mon4))
-  endif
-
-  !Qsac(tim0:(tim1-1))=Qsac_prv0 shengjun comment to use the smoothed flow 5/18/2005
-  !Qsac(tim1:(tim2-1))=Qsac_prv1
-  !Qsac(tim2:(tim3-1))=Qsac_prv2
-  !Qsac(tim3:(tim4-1))=Qsac_prv3
-
-  Qexp(tim0:(tim1-1))=Qexp_prv0
-  Qexp(tim1:(tim2-1))=Qexp_prv1
-  Qexp(tim2:(tim3-1))=Qexp_prv2
-  Qexp(tim3:(tim4-1))=Qexp_prv3
-
-!  Qsjr(tim0:(tim1-1))=Qsjr_prv0!shengjun comment to use smoothed input 4/25/2005
- ! Qsjr(tim1:(tim2-1))=Qsjr_prv1
-  !Qsjr(tim2:(tim3-1))=Qsjr_prv2
-  !Qsjr(tim3:(tim4-1))=Qsjr_prv3
-!  Qsjr(tim4:tim5)=Qsjr_fut
-
-  !start of add by shengjun 4/25/2005
-  smoothedFlow = ConservativeSpline(Qsjr_prv0,Qsjr_prv1,Qsjr_prv2,Qsjr_prv3,Qsjr_fut, mon0,mon1,mon2,mon3,mon4)
-  Qsjr(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)
-  !end of add
-
-  Qsac_oth(tim0:(tim1-1))=Qsac_oth_prv0
-  Qsac_oth(tim1:(tim2-1))=Qsac_oth_prv1
-  Qsac_oth(tim2:(tim3-1))=Qsac_oth_prv2
-  Qsac_oth(tim3:(tim4-1))=Qsac_oth_prv3
-  Qsac_oth(tim4:tim5)=Qsac_oth_fut
-
-  Qexp_oth(tim0:(tim1-1))=Qexp_oth_prv0
-  Qexp_oth(tim1:(tim2-1))=Qexp_oth_prv1
-  Qexp_oth(tim2:(tim3-1))=Qexp_oth_prv2
-  Qexp_oth(tim3:(tim4-1))=Qexp_oth_prv3
-  Qexp_oth(tim4:tim5)=Qexp_oth_fut
+  do i=1, 147
+        DICU(i)=DICU_prv(i)
+  end do
+  DICU(148)=DICU_est
   
-  !start of add by shengjun 2/24/2005
-  DICU(tim0:(tim1-1))=DICU_prv0
-  DICU(tim1:(tim2-1))=DICU_prv1
-  DICU(tim2:(tim3-1))=DICU_prv2
-  DICU(tim3:(tim4-1))=DICU_prv3
-  DICU(tim4:tim5)=DICU_fut
-  !end of add  
+  do i=1, 147
+        DXC(i)=DXC_prv(i)
+  end do
+  DXC(148)=DXC_est
+  
+  do i=1, 147
+        VernEC(i)=VernEC_prv(i)
+  end do
+  VernEC(148)=VernEC_est
 
   !start of add by shengjun 2/15/2005
-  SFtideEndIndex= getSFtideArrayEndIndex(mon4,currMonth,currYear)
-  SFtideStartIndex= SFtideEndIndex - tim5 + 1
-  currSFtide(tim0:tim5)=SFtide(SFtideStartIndex:SFtideEndIndex)  
+  SFtideEndIndex= getSFtideArrayEndIndex(currDay,currMonth,currYear)
+  SFtideStartIndex= SFtideEndIndex - 148 + 1
+  currSFtide(1:148)=SFtide(SFtideStartIndex:SFtideEndIndex)  
   !end of add
- 
-  do i=tim0,(tim1-1)              ! last portion of 4th previous month
-    if (i < (DXC_prv0-(mon0-tim1))) then
-      dxc(i) = 1.0 !shengjun changed to make 1 as DXC open 8/2/2004
-    else
-      dxc(i) = 0.0 !shengjun changed to make 0 as DXC close 8/2/2004
-    end if
-  end do
-  do i=tim1,(tim2-1)              ! 3rd previous month
-    if (i-tim1 < DXC_prv1) then
-      dxc(i) = 1.0 !shengjun changed to make 1 as DXC open 8/2/2004
-    else
-      dxc(i) = 0.0 !shengjun changed to make 0 as DXC close 8/2/2004
-    end if
-  end do
-  do i=tim2,(tim3-1)              ! 2nd previous month
-    if (i-tim2 < DXC_prv2) then
-      dxc(i) = 1.0 !shengjun changed to make 1 as DXC open 8/2/2004
-    else
-      dxc(i) = 0.0 !shengjun changed to make 0 as DXC close 8/2/2004
-    end if
-  end do
-  do i=tim3,(tim4-1)              ! previous month
-    if (i-tim3 < DXC_prv3) then
-      dxc(i) = 1.0 !shengjun changed to make 1 as DXC open 8/2/2004
-    else
-      dxc(i) = 0.0 !shengjun changed to make 0 as DXC close 8/2/2004
-    end if
-  end do
-  do i=tim4,tim5                  ! current month
-    if (i-tim4 < DXC_fut) then
-      dxc(i) = 1.0 !shengjun changed to make 1 as DXC open 8/2/2004
-    else
-      dxc(i) = 0.0 !shengjun changed to make 0 as DXC close 8/2/2004
-    end if
-  end do
-  
-  !start of add by Hao 9/2008
-!  VernEC(tim0:(tim1-1))=VernEC_prv0
-!  VernEC(tim1:(tim2-1))=VernEC_prv1
-!  VernEC(tim2:(tim3-1))=VernEC_prv2
-!  VernEC(tim3:(tim4-1))=VernEC_prv3
-!  VernEC(tim4:tim5)=VernEC_fut
-
-!! beginchange
-
-  T(1:210)=0
-  end_time = tim5
-  do j = 1, 30
-   do i = 1, 7
-    if ( MOD(j,2)== 0 )  then 
-        T(i+(j-1)*7)=1 
-    endif
-   enddo
-  enddo
-  VernEC_prv_V(0) = VernEC_prv0
-  VernEC_prv_V(1) = VernEC_prv1
-  VernEC_prv_V(2) = VernEC_prv2
-  VernEC_prv_V(3) = VernEC_prv3
-  VernEC_prv_V(4) = VernEC_fut
-  tim_beg = (/tim0,    tim1,    tim2,    tim3,    tim4/)
-  tim_end = (/tim1-1,  tim2-1,  tim3-1,  tim4-1,  tim5/)
-  end_time = tim5
-  
-  do i=0,4
-    VernEC_prv_BW(i) =  ( 0.4 < VernEC_prv_V(i) .and. VernEC_prv_V(i) < 0.6 )
-  enddo
-
-  counter=0
-    
-  do i=0,4
-    if (.not. VernEC_prv_BW(i)) then
-      counter = 0
-      VernEC(tim_beg(i):tim_end(i))=VernEC_prv_V(i) 
-    else if (counter < 0.5) then
-      counter = 1
-      VernEC(tim_beg(i):end_time)=T(1:end_time-tim_beg(i)+1)
-    end if  
-  enddo
-!! endchange
-  
-  
-  !end of add  
 
   !---------------------------------------------------------------------------------------
   !implementation method:
@@ -293,35 +168,35 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
   !      else, compute regularly 
   !--------------------------------------------------------------------------------------
 
-  Qsac(tim4:tim5)=QSacMinimum    ! current month: initialize with minimum Qsac
-  Qexp(tim4:tim5)=QExpMinEnforced    ! current month: initialize with minimum export
+  Qsac(148)=QSacMinimum    ! current month: initialize with minimum Qsac
+  Qexp(148)=QExpMinEnforced    ! current month: initialize with minimum export
 
-  QexpMax=Qexp
-  QexpMax(tim4:tim5)=QExpMaximum
+  QexpMax(1:148)=Qexp
+  QexpMax(148)=QExpMaximum
 
   !QsacMax=Qsac shengjun comment to use smoothed flow
-  !QsacMax(tim4:tim5)=QSacMaximum shengjun comment to use smoothed flow
+  !QsacMax(148)=QSacMaximum shengjun comment to use smoothed flow
 
   !start of add by shengjun 4/25/2005
-  smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,QSacMaximum, mon0,mon1,mon2,mon3,mon4)
-  QsacMax(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
+  QsacMax(1:148)=QSac
+  QsacMax(148)=QSacMaximum  
   !end of add
 
-  QexpMin=Qexp
-  QexpMin(tim4:tim5)=QExpMinEnforced !shengjun changed from 0 to ExportMin 2/22/2005 to account for minimum export specified in Calsim
+  QexpMin(1:148)=Qexp
+  QexpMin(148)=QExpMinEnforced !shengjun changed from 0 to ExportMin 2/22/2005 to account for minimum export specified in Calsim
 
   !QsacMin=Qsac shengjun comment to use smoothed flow 5/18/2005
-  !QsacMin(tim4:tim5)=QSacMinimum !shengjun changed from 0 to MinSac 2/22/2005 to account the ANN training range
+  !QsacMin(148)=QSacMinimum !shengjun changed from 0 to MinSac 2/22/2005 to account the ANN training range
   
   !start of add by shengjun 4/25/2005
-  smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,QSacMinimum,mon0,mon1,mon2,mon3,mon4)
-  QsacMin(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
+  QSacMin(1:148)=QSac
+  QsacMin(148)= QSacMinimum  
   !end of add          
   
-  ECSacMinExpMax=ANN_Month(QsacMin+Qsac_oth,QexpMax+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type) ! shengjun 12/16/2004 & Hao 9/2008         
-  ECSacMaxExpMin=ANN_Month(QsacMax+Qsac_oth,QexpMin+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type) !  shengjun 12/16/2004 & Hao 9/2008  
-  ECSacMinExpMin=ANN_Month(QsacMin+Qsac_oth,QexpMin+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type) ! !shengjun 12/16/2004 & Hao 9/2008 
-  ECSacMaxExpMax=ANN_Month(QsacMax+Qsac_oth,QexpMax+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type) !  !shengjun 12/16/2004 & Hao 9/2008   
+  ECSacMinExpMax=ANN_Daily(QsacMin+Qsac_oth,QexpMax+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location) ! shengjun 12/16/2004 & Hao 9/2008         
+  ECSacMaxExpMin=ANN_Daily(QsacMax+Qsac_oth,QexpMin+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location) !  shengjun 12/16/2004 & Hao 9/2008  
+  ECSacMinExpMin=ANN_Daily(QsacMin+Qsac_oth,QexpMin+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location) ! !shengjun 12/16/2004 & Hao 9/2008 
+  ECSacMaxExpMax=ANN_Daily(QsacMax+Qsac_oth,QexpMax+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location) !  !shengjun 12/16/2004 & Hao 9/2008   
         
   !print *, "step1"
   TOL=0.01 ! changed from 1.0 to 0.1 7/30/07
@@ -383,11 +258,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         IF (variable==2) value=0.0
         IF (variable==3) then !shengjun 5/11/2005
           print *, "Wrong option" 
-          deallocate (smoothedFlow) !4/25/2005
           stop
         end if
         
-        deallocate (smoothedFlow) !4/25/2005
         return      
       
       else if(ECSacMinExpMax <= ECTARGET) then
@@ -397,11 +270,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         IF (variable==2) value=999999.0
         IF (variable==3) then !shengjun 5/11/2005
           print *, "Wrong option" !value=0.0
-          deallocate (smoothedFlow) !4/25/2005
           stop
         end if
-        
-        deallocate (smoothedFlow) !4/25/2005    
+           
         return    
                  
       END IF  
@@ -417,11 +288,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         IF (variable==2) value=999997.0
         IF (variable==3) then !shengjun 5/11/2005
           print *, "Wrong option" !value=0.0
-          deallocate (smoothedFlow) !4/25/2005
           stop
         end if
-        
-        deallocate (smoothedFlow) !4/25/2005    
+            
         return    
       else if(ECSacMaxExpMax > ECTARGET) THEN !shengjun add for revisition 9/28/2005
         if(debugCode)  LinearizationMethod='---always infeasible' !shengjun
@@ -429,11 +298,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         IF (variable==2) value=0.0
         IF (variable==3) then !shengjun 5/11/2005
           print *, "Wrong option" 
-          deallocate (smoothedFlow) !4/25/2005
           stop
         end if
         
-        deallocate (smoothedFlow) !4/25/2005
         return      
     
       end if
@@ -489,11 +356,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
       IF (variable==2) value=0.0
       IF (variable==3) then !shengjun 5/11/2005
         print *, "Wrong option" 
-        deallocate (smoothedFlow) !4/25/2005
         stop
       end if
       
-      deallocate (smoothedFlow) !4/25/2005
       return      
 
     end if
@@ -520,7 +385,7 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
       !find the head point of ECtarget cone, or the point where the ECtarget contour crosses Minimum Sac flow line                 
       if(MinECQsacMin < ECtarget) then!EC target cone head at the left of Min Sac flow line
         !find the crossing point of EC target contour with Higher export, the crossing point of EC target contour with Less export is ignored becasue of negative slope        	       	        
-        Qsac(1:tim5)= QsacMin !assign the smoothed sac flow with curr month minimum flow
+        Qsac= QsacMin !assign the smoothed sac flow with curr month minimum flow
 	      
 	      Qmin=QexpMinECQsacMin
 	      Qmax=QExpMaximum 
@@ -528,9 +393,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	      do while (DIFF > TOL)
 	        DIFF=ABS(Qmax-Qmin)
 	        Qmid=0.5*(Qmin+Qmax)
-	        Qexp(tim4:tim5)=Qmid
+	        Qexp(148)=Qmid
 	        
-	        ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008 
+	        ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008 
 	        
 	        if(abs(ECtarget-ECmid) < ECtolerance) exit !4/10/2006
 	        
@@ -568,17 +433,13 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	      do while (DIFF > TOL)
 	        DIFF=ABS(Qmax-Qmin)
 	        Qmid=0.5*(Qmin+Qmax)
-	        !Qsac(tim4:tim5)=Qmid shengjun
-          !start of add by shengjun 5/18/2005
-          smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qmid,mon0,mon1,mon2,mon3,mon4)
-          Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
-          !end of add
+	        Qsac(148)=Qmid 
 	        
-	        Qexp(tim4:tim5)=Qmid*ConeLineSlope+ConeLineIntercept
-	        ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008 
+	        Qexp(148)=Qmid*ConeLineSlope+ConeLineIntercept
+	        ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008 
 	        
 	        if(tryNo ==1)then!double check
-	          if(ECmid > ANN_Month(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)) then  !9/2008
+	          if(ECmid > ANN_Daily(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)) then  !9/2008
               if(debugCode) call ErrMessage("**!!** this should not happen: Assumption violated because of inverse gradient. ", &
                   location, currYear,currMonth,ECTARGET,linear1,linear2,ForceOption)
               stop
@@ -644,11 +505,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         IF (variable==2) value=0.0
         IF (variable==3) then !shengjun 5/11/2005
           print *, "Wrong option" 
-          deallocate (smoothedFlow) !4/25/2005
           stop
         end if
                       
-        deallocate (smoothedFlow) !4/25/2005
         return 
         
       end if                             
@@ -660,11 +519,10 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
       
       do while (tempEC >= ECtempQsacMinExp)
       
-        smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,tempQsac,mon0,mon1,mon2,mon3,mon4)
-        Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
+        Qsac(148)= tempQsac  
         
-        Qexp(tim4:tim5)=QExpMaximum !QExpMinEnforced 4/14/2006
-	      ECtempQsacMinExp=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type) !9/2008
+        Qexp(148)=QExpMaximum !QExpMinEnforced 4/14/2006
+	      ECtempQsacMinExp=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location) !9/2008
 	      
 	      MinECtempQsac =  ECtempQsacMinExp !minimum EC at line of tempQsac: initialization 4/14/2006
         tempQexp = QExpMinEnforced!Exp when minimum EC occurs with Qsac Min, initialization and will be overwritten by the following function
@@ -733,7 +591,7 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	    do while (DIFF > TOL)
 	      DIFF=ABS(Qmax-Qmin)
 	      Qmid=0.5*(Qmin+Qmax)
-	      !Qsac(tim4:tim5)=Qmid
+	      !Qsac(148)=Qmid
         
         !shengjun 3/27/2006: if searching goes out of solution space then stop
         if( (0.9*QExpMaximum) < (Qmid*ConeLineSlope+ConeLineIntercept) .or. &
@@ -747,14 +605,13 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
             
         end if
         
-        smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qmid,mon0,mon1,mon2,mon3,mon4)
-        Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  	      
-	      Qexp(tim4:tim5)=Qmid*ConeLineSlope+ConeLineIntercept	      	      
+          Qsac(148)= Qmid  	      
+	      Qexp(148)=Qmid*ConeLineSlope+ConeLineIntercept	      	      
 	      
-	      ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008 
+	      ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008 
 	      
 	      if(tryNo ==1)then!check for possible inverse gradient
-	        if(ECmid > ANN_Month(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)) then  !9/2008
+	        if(ECmid > ANN_Daily(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)) then  !9/2008
             if(debugCode) call ErrMessage("**!!** Inverse gradient in a valley cone (uniform slope at min sac flow line).",location, currYear,currMonth,ECTARGET,linear1,linear2,ForceOption)      
           end if     
         end if
@@ -817,7 +674,7 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         if(debugCode == .true.) LinearizationMethod='---EC target contour hit maximum export'  !shengjun
         
         !find x2 range:
-        Qexp(tim4:tim5)=QExpMaximum            
+        Qexp(148)=QExpMaximum            
 	      Qmin=QSacMinimum 
 	      Qmax=QSacMaximum
 	      DIFF=TOL+1.
@@ -826,13 +683,13 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	      do while (DIFF > TOL)
 	        DIFF=ABS(Qmax-Qmin)
 	        Qmid=0.5*(Qmin+Qmax)
-          smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qmid,mon0,mon1,mon2,mon3,mon4)
-          Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
           
-	        ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008 
+            Qsac(148)= Qmid
+          
+	        ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008 
 	        
 	        if(tryNo ==1)then!check for possible inverse gradient
-	          if(ECmid > ANN_Month(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)) then
+	          if(ECmid > ANN_Daily(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)) then
               if(debugCode) call ErrMessage("**!!** Inverse gradient should not happen here.", &
                      location, currYear,currMonth,ECTARGET,linear1,linear2,ForceOption)
             end if     
@@ -871,8 +728,7 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         !only need to find out y2
           y1= QExpECtargetConeHead        
           
-          smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,x2,mon0,mon1,mon2,mon3,mon4)
-          Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
+          Qsac(148)= x2 
     	    
 !	        if(ConeLineSlope >= 0.0) then!4/13/2006
  ! 	        Qmin=y1 	                
@@ -888,8 +744,8 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	          do while (DIFF > TOL)
 	            DIFF=ABS(Qmax-Qmin)
 	            Qmid=0.5*(Qmin+Qmax)
-	            Qexp(tim4:tim5)=Qmid
-	            ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008 
+	            Qexp(148)=Qmid
+	            ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008 
 	            
 	            if(abs(ECtarget-ECmid) < TOL) exit !4/10/2006
 	            
@@ -920,15 +776,13 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
           do i=1, 2        
             if(i==1) then
             
-              smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,x1,mon0,mon1,mon2,mon3,mon4)
-              Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)      	       
+              Qsac(148) = x1     	       
 	            
   	          Qmin=QExpECtargetConeHead +	ConeLineSlope*(x1-QSacECtargetConeHead) !4/13/2006 	          
 	            
 	          else
 	          	          	          
-              smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,x2,mon0,mon1,mon2,mon3,mon4)
-              Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
+              Qsac(148)= x2  
     	        
   	          Qmin=QExpECtargetConeHead +	ConeLineSlope*(x2-QSacECtargetConeHead) !4/13/2006 	          
 	          end if
@@ -944,8 +798,8 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	          do while (DIFF > TOL)
 	            DIFF=ABS(Qmax-Qmin)
 	            Qmid=0.5*(Qmin+Qmax)
-	            Qexp(tim4:tim5)=Qmid
-	            ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008 
+	            Qexp(148)=Qmid
+	            ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008 
 	            
 	            if(abs(ECtarget-ECmid) < TOL) exit !4/10/2006
 	            
@@ -976,8 +830,7 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 
           !print *, "step6"
           
-          smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,x1,mon0,mon1,mon2,mon3,mon4)
-          Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
+            Qsac(148)= x1  
     	        	    
 	        Qmin = QExpECtargetConeHead + (x1-QSacECtargetConeHead)*ConeLineSlope !4/12/2006
     	        	    
@@ -988,8 +841,8 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	        do while (DIFF > TOL)
 	          DIFF=ABS(Qmax-Qmin)
 	          Qmid=0.5*(Qmin+Qmax)
-	          Qexp(tim4:tim5)=Qmid
-	          ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008 
+	          Qexp(148)=Qmid
+	          ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008 
 	          
 	          if(abs(ECtarget-ECmid) < TOL) exit !4/10/2006
 	          
@@ -1040,9 +893,7 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         !only need to find y2
           y1= QExpECtargetConeHead        
           
-	        !Qsac(tim4:tim5)=x2 shengjun comment
-          smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,x2,mon0,mon1,mon2,mon3,mon4)
-          Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
+          Qsac(148)= x2  
     	    
 	        !Qmin=QexpMinECQsacMin shengjun comment 4/10/2006\
 	        	        
@@ -1059,8 +910,8 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	        do while (DIFF > TOL)
 	          DIFF=ABS(Qmax-Qmin)
 	          Qmid=0.5*(Qmin+Qmax)
-	          Qexp(tim4:tim5)=Qmid
-	          ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008 
+	          Qexp(148)=Qmid
+	          ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008 
 	          
 	          if(abs(ECtarget-ECmid) < TOL) exit !4/10/2006
 	          
@@ -1084,17 +935,13 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
           
           do i=1, 2        
             if(i==1) then
-	            !Qsac(tim4:tim5)=x1 
-              smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,x1,mon0,mon1,mon2,mon3,mon4)
-              Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
+              Qsac(148)=x1  
   	          
   	          Qmin=QExpECtargetConeHead +	ConeLineSlope*(x1-QSacECtargetConeHead)!4/13/2006
     	        
 	          else
-	            !Qsac(tim4:tim5)=x2	            
-              smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,x2,mon0,mon1,mon2,mon3,mon4)
-              Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
-
+	            Qsac(148)=x2	            
+      
   	          Qmin=QExpECtargetConeHead +	ConeLineSlope*(x2-QSacECtargetConeHead)!4/13/2006    	        
   	          
 	          end if
@@ -1106,8 +953,8 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	          do while (DIFF > TOL)
 	            DIFF=ABS(Qmax-Qmin)
 	            Qmid=0.5*(Qmin+Qmax)
-	            Qexp(tim4:tim5)=Qmid
-	            ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	            Qexp(148)=Qmid
+	            ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	            
 	            if(abs(ECtarget-ECmid) < TOL) exit !4/10/2006
 	            
@@ -1165,11 +1012,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
           IF (variable==2) value=999993.0
           IF (variable==3) then
             print *, "Wrong option"
-            deallocate (smoothedFlow)
             stop
           end if
           
-          deallocate (smoothedFlow)
           return 
         
         else 
@@ -1180,11 +1025,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
           IF (variable==2) value=999993.5
           IF (variable==3) then
             print *, "Wrong option"
-            deallocate (smoothedFlow)
             stop
           end if
           
-          deallocate (smoothedFlow)
           return 
                                 
         end if
@@ -1197,11 +1040,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         IF (variable==2) value=0.0
         IF (variable==3) then !shengjun 5/11/2005
           print *, "Wrong option" 
-          deallocate (smoothedFlow) !4/25/2005
           stop
         end if
                       
-        deallocate (smoothedFlow) !4/25/2005
         return 
         
       else!infeasible along Max sac line and mountain along max sac flow line
@@ -1218,11 +1059,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
           IF (variable==2) value=0.0
           IF (variable==3) then 
             print *, "Wrong option" 
-            deallocate (smoothedFlow) 
             stop
           end if
           
-          deallocate (smoothedFlow)
           return             
           
         end if      
@@ -1236,11 +1075,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         IF (variable==2) value=0.0
         IF (variable==3) then 
           print *, "Wrong option" 
-          deallocate (smoothedFlow) 
           stop
         end if          
     
-        deallocate (smoothedFlow)
         return                                                   
       end if  
        
@@ -1261,10 +1098,8 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
       IF (variable==2) value=999999.0
       IF (variable==3) then !shengjun 5/11/2005
         print *, "Wrong option" !value=0.0
-        deallocate (smoothedFlow) !4/25/2005
         stop
       end if
-      deallocate (smoothedFlow) !4/25/2005    
       return
 
     else IF (ECSacMinExpMax > ECTARGET+ECtolerance .and. ECSacMinExpMin > ECTARGET+ECtolerance .and. & !shengjun 4/17/2006
@@ -1275,11 +1110,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
       IF (variable==2) value=0.0
       IF (variable==3) then !shengjun 5/11/2005
         print *, "Wrong option" 
-        deallocate (smoothedFlow) !4/25/2005
         stop
       end if
                     
-      deallocate (smoothedFlow) !4/25/2005
       return 
       
     else if (ECSacMinExpMax < ECSacMinExpMin .and. ECSacMaxExpMax < ECSacMaxExpMin) THEN !inverse gradient: along both min sac flow and maximum sac flow
@@ -1292,11 +1125,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         IF (variable==2) value=0.0
         IF (variable==3) then !shengjun 5/11/2005
           print *, "Wrong option" 
-          deallocate (smoothedFlow) !4/25/2005
           stop
         end if
                       
-        deallocate (smoothedFlow) !4/25/2005
         return 
 
       else if(ECSacMaxExpMin < ECTARGET .and. ECSacMinExpMin < ECTARGET) then
@@ -1305,11 +1136,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         IF (variable==2) value=999996.0
         IF (variable==3) then !shengjun 5/11/2005
           print *, "Wrong option" !value=0.0
-          deallocate (smoothedFlow) !4/25/2005
           stop
         end if
         
-        deallocate (smoothedFlow) !4/25/2005    
         return    
                      
       else !usually make feasible because CalSim can not handle this kind of constraints
@@ -1322,11 +1151,9 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         IF (variable==2) value=999995.0
         IF (variable==3) then !shengjun 5/11/2005
           print *, "Wrong option" !value=0.0
-          deallocate (smoothedFlow) !4/25/2005
           stop
         end if
-        
-        deallocate (smoothedFlow) !4/25/2005    
+          
         return    
       end if    
     END IF      
@@ -1358,15 +1185,15 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         !--------------------------------------------------------------------
         if(ECtarget <= ECSacMinExpMax .AND. ECtarget >= ECSacMaxExpMax) then
           if(debugCode == .true.) LinearizationMethod='---Linear A situation'  !shengjun
-          Qexp(tim4:tim5)=point
-          !Qsac(tim4:tim5)=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005 and comment
-          Qsac(1:tim5)= QsacMin !shengjun add
+          Qexp(148)=point
+          !Qsac(148)=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005 and comment
+          Qsac(1:148)= QsacMin !shengjun add
 
-          ECtest1=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+          ECtest1=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
           !normal conditions------------------------
           if(ECtest1 >= ECtarget) then
             !find Sac given export=point (for both point1 and point2)
-            Qexp(tim4:tim5)=point
+            Qexp(148)=point
 	          Qmin=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005  
 	          Qmax=QSacMaximum
 	          DIFF=TOL+1.
@@ -1375,17 +1202,12 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	          do while (DIFF > TOL)
 	            DIFF=ABS(Qmax-Qmin)
 	            Qmid=0.5*(Qmin+Qmax)
-	            !Qsac(tim4:tim5)=Qmid shengjun comment 
-	            
-              !start of add by shengjun 5/18/2005
-              smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qmid,mon0,mon1,mon2,mon3,mon4)
-              Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
-              !end of add
+	            Qsac(148)=Qmid  
 
-	            ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	            ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	            
 	            if(tryNo ==1)then!check for possible inverse gradient
-	              if(ECmid > ANN_Month(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)) then !9/2008
+	              if(ECmid > ANN_Daily(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)) then !9/2008
                   if(debugCode) call ErrMessage("**!!** Inverse gradient in a valley cone (type A:normal conditions).",location, currYear,currMonth,ECTARGET,linear1,linear2,ForceOption)      
                 end if     
     	          
@@ -1415,8 +1237,8 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
             !point1---------------------------------
             if(i==1)then
               !find export given Sac=0 (for point1)
-              !Qsac(tim4:tim5)=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005 and comment
-              Qsac(1:tim5)= QsacMin !shengjun
+              !Qsac(148)=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005 and comment
+              Qsac(1:148)= QsacMin !shengjun
               
 	            Qmin=QExpMinEnforced ! shengjun changed from 0. to QExpMinEnforced 2/22/2005
 	            Qmax=QExpMaximum
@@ -1424,8 +1246,8 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	            do while (DIFF > TOL)
 	                DIFF=ABS(Qmax-Qmin)
 	                Qmid=0.5*(Qmin+Qmax)
-	                Qexp(tim4:tim5)=Qmid
-	                ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	                Qexp(148)=Qmid
+	                ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	                if(ECmid > ECtarget)then
 	                    Qmax=Qmid
 	                else
@@ -1447,12 +1269,11 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
                 !if point1 also missed interception then toss out this line
                 IF (variable==1) value=0.0
                 IF (variable==2) value=999998.0
-                deallocate (smoothedFlow) !4/25/2005
                 return
               else
               !end of add
                 !find Sac given export=15000 (for point2)
-                Qexp(tim4:tim5)=QExpMaximum            
+                Qexp(148)=QExpMaximum            
 	              Qmin=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005	    
 	              Qmax=QSacMaximum
 	              DIFF=TOL+1.
@@ -1462,16 +1283,12 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	              do while (DIFF > TOL)
 	                DIFF=ABS(Qmax-Qmin)
 	                Qmid=0.5*(Qmin+Qmax)
-	                !Qsac(tim4:tim5)=Qmid shengjun comment
-                  !start of add by shengjun 5/18/2005
-                  smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qmid,mon0,mon1,mon2,mon3,mon4)
-                  Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
-                  !end of add	                
+	                Qsac(148)=Qmid                 
 	                
-	                ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	                ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	                
 	                if(tryNo ==1)then!check for possible inverse gradient
-	                  if(ECmid > ANN_Month(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)) then  !9/2008
+	                  if(ECmid > ANN_Daily(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)) then  !9/2008
                       if(debugCode) call ErrMessage("**!!** Inverse gradient (type A).", &
                           location, currYear,currMonth,ECTARGET,linear1,linear2,ForceOption)
                     end if     
@@ -1500,17 +1317,17 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         else if(ECtarget <= ECSacMaxExpMax .AND. ECtarget >= ECSacMaxExpMin) then
           if(debugCode == .true.) LinearizationMethod='---Linear B situation'  !shengjun
           
-          Qexp(tim4:tim5)=point
-          !Qsac(tim4:tim5)=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005 and comment          
-          Qsac(1:tim5)= QsacMin !shengjun add
+          Qexp(148)=point
+          !Qsac(148)=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005 and comment          
+          Qsac(1:148)= QsacMin !shengjun add
           
-          ECtest1=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+          ECtest1=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
           !below intercept--------------------------
           if(ECtest1 <= ECtarget) then
             !find export given Sac=0 (for point1)------
             if(i==1)then
-              !Qsac(tim4:tim5)=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005 and comment 
-              Qsac(1:tim5)= QsacMin
+              !Qsac(148)=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005 and comment 
+              Qsac(1:148)= QsacMin
               
 	            Qmin=QExpMinEnforced ! shengjun changed from 0. to QExpMinEnforced 2/22/2005
 	            Qmax=QExpMaximum
@@ -1518,8 +1335,8 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	            do while (DIFF > TOL)
 	              DIFF=ABS(Qmax-Qmin)
 	              Qmid=0.5*(Qmin+Qmax)
-	              Qexp(tim4:tim5)=Qmid
-	              ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	              Qexp(148)=Qmid
+	              ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	              if(ECmid > ECtarget)then
 	                Qmax=Qmid
 	              else
@@ -1542,12 +1359,11 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
                 !if point1 also missed interception then toss out this line
                 IF (variable==1) value=0.0
                 IF (variable==2) value=999998.0
-                deallocate (smoothedFlow) !4/25/2005
                 return
               else
               !end of add
             
-                Qsac(1:tim5)=QsacMax !shengjun add
+                Qsac(1:148)=QsacMax !shengjun add
 
 	              Qmin=QExpMinEnforced ! shengjun changed from 0. to QExpMinEnforced 2/22/2005
 	              Qmax=QExpMaximum
@@ -1555,8 +1371,8 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	              do while (DIFF > TOL)
 	                DIFF=ABS(Qmax-Qmin)
 	                Qmid=0.5*(Qmin+Qmax)
-	                Qexp(tim4:tim5)=Qmid
-	                ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	                Qexp(148)=Qmid
+	                ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	                if(ECmid > ECtarget)then
 	                  Qmax=Qmid
 	                else
@@ -1576,12 +1392,12 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 
           !above intercept--------------------------
           else if(ECtest1 > ECtarget) then
-            Qexp(tim4:tim5)=point
-            Qsac(1:tim5)=QSacMax !shengjun
-            ECtest2=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+            Qexp(148)=point
+            Qsac(1:148)=QSacMax !shengjun
+            ECtest2=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
             !below right intercept--------------------------
             if(ECtest2 <= ECtarget) then
-              Qexp(tim4:tim5)=point
+              Qexp(148)=point
 	            Qmin=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005
 	            Qmax=QSacMaximum
 	            DIFF=TOL+1.
@@ -1590,16 +1406,12 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	            do while (DIFF > TOL)
 	              DIFF=ABS(Qmax-Qmin)
 	              Qmid=0.5*(Qmin+Qmax)
-	              !Qsac(tim4:tim5)=Qmid shengjun 
-                !start of add by shengjun 5/18/2005
-                smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qmid,mon0,mon1,mon2,mon3,mon4)
-                Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
-                !end of add
+	              Qsac(148)=Qmid 
 	              
-	              ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	              ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	              
 	              if(tryNo ==1)then!check for possible inverse gradient 4/11/2006
-	                if(ECmid > ANN_Month(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)) then  !9/2008
+	                if(ECmid > ANN_Daily(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)) then  !9/2008
                     if(debugCode) call ErrMessage("**!!** Inverse gradient(type B).",location, currYear,currMonth,ECTARGET,linear1,linear2,ForceOption)      
                   end if     
               	  
@@ -1629,16 +1441,16 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
               !point1---------------------------------
 	            if(i==1)then
 	              !find export given Sac=0 (for point1)
-	              !Qsac(tim4:tim5)=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005
-	              Qsac(1:tim5)=QsacMin !shengjun 5/18/2005
+	              !Qsac(148)=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005
+	              Qsac(1:148)=QsacMin !shengjun 5/18/2005
 	              Qmin=QExpMinEnforced ! shengjun changed from 0. to QExpMinEnforced 2/22/2005
 	              Qmax=QExpMaximum
 	              DIFF=TOL+1.
 	              do while (DIFF > TOL)
 	                DIFF=ABS(Qmax-Qmin)
 	                Qmid=0.5*(Qmin+Qmax)
-	                Qexp(tim4:tim5)=Qmid
-	                ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	                Qexp(148)=Qmid
+	                ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	                if(ECmid > ECtarget)then
 	                  Qmax=Qmid
 	                else
@@ -1661,20 +1473,19 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
                   !if point1 also missed interception then toss out this line
                   IF (variable==1) value=0.0
                   IF (variable==2) value=999998.0
-                  deallocate (smoothedFlow) !4/25/2005
                   return
                 else
                 !end of add	        
 	                !find export given Sac=25000 (for point2)
-	                Qsac(1:tim5)=QSacMax !shengjun
+	                Qsac(1:148)=QSacMax !shengjun
 	                Qmin=QExpMinEnforced ! shengjun changed from 0. to QExpMinEnforced 2/22/2005
 	                Qmax=QExpMaximum
 	                DIFF=TOL+1.
 	                do while (DIFF > TOL)
 	                  DIFF=ABS(Qmax-Qmin)
 	                  Qmid=0.5*(Qmin+Qmax)
-	                  Qexp(tim4:tim5)=Qmid
-	                  ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	                  Qexp(148)=Qmid
+	                  ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	                  if(ECmid > ECtarget)then
 	                      Qmax=Qmid
 	                  else
@@ -1706,7 +1517,7 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         if(ECtarget <= ECSacMinExpMax .AND. ECtarget >= ECSacMaxExpMax) then
           if(debugCode == .true.) LinearizationMethod='---Linear C situation'  !shengjun
           
-          Qexp(tim4:tim5)=point
+          Qexp(148)=point
           Qmin=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005
           Qmax=QSacMaximum
           DIFF=TOL+1.
@@ -1715,16 +1526,12 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
           do while (DIFF > TOL)
 	          DIFF=ABS(Qmax-Qmin)
 	          Qmid=0.5*(Qmin+Qmax)
-	          !Qsac(tim4:tim5)=Qmid shengjun
-            !start of add by shengjun 5/18/2005
-            smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qmid,mon0,mon1,mon2,mon3,mon4)
-            Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
-            !end of add
+	          Qsac(148)=Qmid 
 	          
-	          ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	          ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	          
 	          if(tryNo ==1)then!check for possible inverse gradient 4/11/2006
-	            if(ECmid > ANN_Month(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)) then  !9/2008
+	            if(ECmid > ANN_Daily(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)) then  !9/2008
                   if(debugCode) call ErrMessage("**!!** Inverse gradient (type C).",location, currYear,currMonth,ECTARGET,linear1,linear2,ForceOption)      
               end if     
               
@@ -1756,13 +1563,13 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         else if(ECtarget <= ECSacMaxExpMax .AND. ECtarget >= ECSacMaxExpMin) then
           if(debugCode == .true.) LinearizationMethod='---Linear D situation'  !shengjun
                    
-          Qexp(tim4:tim5)=point 
-          Qsac(1:tim5)=QSacMax !shengjun
-          ECtest1=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+          Qexp(148)=point 
+          Qsac(1:148)=QSacMax !shengjun
+          ECtest1=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
           !normal conditions------------------------
           if(ECtest1 <= ECtarget) then
 	          !find Sac given export=point (for both point1 and point2)
-	          Qexp(tim4:tim5)=point
+	          Qexp(148)=point
 	          Qmin=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005
 	          Qmax=QSacMaximum
 	          DIFF=TOL+1.	          
@@ -1771,16 +1578,12 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	          do while (DIFF > TOL)
 	            DIFF=ABS(Qmax-Qmin)
 	            Qmid=0.5*(Qmin+Qmax)
-	            !Qsac(tim4:tim5)=Qmid shengjun
-              !start of add by shengjun 5/18/2005
-              smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qmid,mon0,mon1,mon2,mon3,mon4)
-              Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
-              !end of add
+	            Qsac(148)=Qmid 
 	            
-	            ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	            ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	            
 	            if(tryNo ==1)then!check for possible inverse gradient 4/11/2006
-	              if(ECmid > ANN_Month(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)) then  !9/2008
+	              if(ECmid > ANN_Daily(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)) then  !9/2008
                   if(debugCode) call ErrMessage("**!!** Inverse gradient (type D: normal condition).",location, currYear,currMonth,ECTARGET,linear1,linear2,ForceOption)      
                 end if     
               	
@@ -1809,7 +1612,7 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	          !point1---------------------------------
 	          if(i==1)then
 	            !find Sac given export=0 (for point1)
-	            Qexp(tim4:tim5)=QExpMinEnforced ! shengjun changed from 0. to QExpMinEnforced 2/22/2005
+	            Qexp(148)=QExpMinEnforced ! shengjun changed from 0. to QExpMinEnforced 2/22/2005
 	            Qmin=QSacMinimum ! shengjun changed from 0. to QSacMinimum 2/22/2005
 	            Qmax=QSacMaximum
 	            DIFF=TOL+1.
@@ -1818,16 +1621,12 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
 	            do while (DIFF > TOL)
 	              DIFF=ABS(Qmax-Qmin)
 	              Qmid=0.5*(Qmin+Qmax)
-	              !Qsac(tim4:tim5)=Qmid shengjun
-                !start of add by shengjun 5/18/2005
-                smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qmid,mon0,mon1,mon2,mon3,mon4)
-                Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
-                !end of add
+	              Qsac(148)=Qmid 
 	              
-	              ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	              ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	              
 	              if(tryNo ==1)then!check for possible inverse gradient 4/11/2006
-	                if(ECmid > ANN_Month(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)) then  !9/2008
+	                if(ECmid > ANN_Daily(QsacMin+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)) then  !9/2008
                       if(debugCode) call ErrMessage("**!!** Inverse gradient (type D:above intercept).",location, currYear,currMonth,ECTARGET,linear1,linear2,ForceOption)      
                   end if     
                 	
@@ -1854,21 +1653,20 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
                 !if point1 also missed interception then toss out this line
                 IF (variable==1) value=0.0
                 IF (variable==2) value=999998.0
-                deallocate (smoothedFlow) !4/25/2005
                 return
               else
               !end of add
   	        
 	              !find export given Sac=25000 (for point2)
-	              Qsac(1:tim5)=QSacMax !shengjun add 5/18/2005
+	              Qsac(1:148)=QSacMax !shengjun add 5/18/2005
 	              Qmin=QExpMinEnforced ! shengjun changed from 0. to QExpMinEnforced 2/22/2005
 	              Qmax=QExpMaximum
 	              DIFF=TOL+1.
 	              do while (DIFF > TOL)
 	                DIFF=ABS(Qmax-Qmin)
 	                Qmid=0.5*(Qmin+Qmax)
-	                Qexp(tim4:tim5)=Qmid
-	                ECmid=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)!shengjun 12/16/2004 & Hao 9/2008
+	                Qexp(148)=Qmid
+	                ECmid=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)!shengjun 12/16/2004 & Hao 9/2008
 	                if(ECmid > ECtarget)then
 	                  Qmax=Qmid
 	                else
@@ -1902,8 +1700,7 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
                     
         if (debugCode) print *,"The ECtarget contour in in the top of  Month, Year:", currMonth,currYear                          
         if (debugCode) print *,"ECSacMinExpMin,ECSacMaxExpMin,ECSacMinExpMax,ECSacMaxExpMax with EC target:",ECSacMinExpMin,ECSacMaxExpMin,ECSacMinExpMax,ECSacMaxExpMax, ECtarget
-        if (debugCode) print *,"MinECQsacMin,MinECQsacMax:",MinECQsacMin,MinECQsacMax
-        deallocate (smoothedFlow) !4/25/2005                  
+        if (debugCode) print *,"MinECQsacMin,MinECQsacMax:",MinECQsacMin,MinECQsacMax                  
         return
       
       end if
@@ -1971,16 +1768,11 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         real tempFlow, tempEC,QExpMinEC
         
         MinEC=1.0E10            
-        !Qsac(tim4:tim5)=QSacFlow shengjun comment
-        
-        !start of add by shengjun 4/25/2005
-        smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,QSacFlow,mon0,mon1,mon2,mon3,mon4)
-        Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
-        !end of add
+        Qsac(148)=QSacFlow
         
   	    do tempFlow = QMinExp+StepSize,QMaxExp, StepSize
-	        Qexp(tim4:tim5)= tempFlow
-	        tempEC=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)  !9/2008
+	        Qexp(148)= tempFlow
+	        tempEC=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)  !9/2008
 
 	        if(tempEC > 1.0E10) then
             if(debugCode) call ErrMessage("!!!! ANN EC is not reasonable when running LocateMinECSequentially () at (location, currYear,currMonth) with EC (and QSacFlow,Export,ForceOption): ", &
@@ -2005,16 +1797,11 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
         real tempFlow, tempEC,QExpMaxEC
         
         MaxEC=0.0 !4/17/2006
-        !Qsac(tim4:tim5)=QSacFlow shengjun comment
-        
-        !start of add by shengjun 4/25/2005
-        smoothedFlow = ConservativeSpline(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,QSacFlow,mon0,mon1,mon2,mon3,mon4)
-        Qsac(1:tim5)= smoothedFlow(mon0+mon1+mon2+mon3+mon4-tim5+1:mon0+mon1+mon2+mon3+mon4)  
-        !end of add
+        Qsac(148)=QSacFlow
         
   	    do tempFlow = QMinExp+StepSize,QMaxExp, StepSize
-	        Qexp(tim4:tim5)= tempFlow
-	        tempEC=ANN_Month(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location,mon4,ave_type)  !9/2008
+	        Qexp(148)= tempFlow
+	        tempEC=ANN_Daily(Qsac+Qsac_oth,Qexp+Qexp_oth,Qsjr,currSFtide,DICU,DXC,VernEC,location)  !9/2008
 	        
 	        if(tempEC > 1.0E10) then
             if(debugCode) call ErrMessage("!!!! ANN EC is not reasonable when running LocateMaxECSequentially () at (location, currYear,currMonth) with EC (and QSacFlow,Export,ForceOption): ", &
@@ -2028,4 +1815,4 @@ FUNCTION AnnLineGen(Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,&
     end function LocateMaxECSequentially
     
    !end of add
-END FUNCTION AnnLineGen
+END FUNCTION AnnLineGen_Daily

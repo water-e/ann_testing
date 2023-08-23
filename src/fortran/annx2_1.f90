@@ -48,15 +48,7 @@ FUNCTION AnnX2( &
   ! DXC=0,CLOSED  DXC=1,OPEN
   REAL,INTENT(IN)    :: &
        Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qsac_prv4,&
-       Qexp_prv0,Qexp_prv1,Qexp_prv2,Qexp_prv3,Qexp_prv4
-  
- !!beginchange for SMSCG update
-  logical,dimension(0:4) :: Qsac_prv_BW =.false.
-  real   ,dimension(0:4) :: Qsac_prv_V=0
-  integer,dimension(210) :: T=0
-  integer,dimension(0:4) :: tim_beg, tim_end
-  integer :: counter=0, end_time, j
-!!endchange
+       Qexp_prv0,Qexp_prv1,Qexp_prv2,Qexp_prv3,Qexp_prv4       
   
   integer, INTENT(IN) :: currMonth, currYear ! 2/14/2005
   integer, optional, intent(in) :: BeginDay, EndDay !only used in ave_type ==10
@@ -113,49 +105,11 @@ FUNCTION AnnX2( &
   tim1=tim2-mon0               ! 3 months ago from tim4
   tim0=1                       ! 147 day before tim5
   
-!  Qsac(tim0:(tim1-1))=Qsac_prv0
-!  Qsac(tim1:(tim2-1))=Qsac_prv1
-!  Qsac(tim2:(tim3-1))=Qsac_prv2
-!  Qsac(tim3:(tim4-1))=Qsac_prv3
-!  Qsac(tim4:tim5)=Qsac_prv4
-  
- !! begin change - SMSCG update for 7 day op, 7 day open for contineously for 2 or more months with 0.5 output from CS3
-
-  T(1:210)=0
-  end_time = tim5
-  do j = 1, 30
-   do i = 1, 7
-    if ( MOD(j,2)== 0 )  then 
-        T(i+(j-1)*7)=1 
-    endif
-   enddo
-  enddo
-  Qsac_prv_V(0) = Qsac_prv0
-  Qsac_prv_V(1) = Qsac_prv1
-  Qsac_prv_V(2) = Qsac_prv2
-  Qsac_prv_V(3) = Qsac_prv3
-  Qsac_prv_V(4) = Qsac_prv4
-  tim_beg = (/tim0,    tim1,    tim2,    tim3,    tim4/)
-  tim_end = (/tim1-1,  tim2-1,  tim3-1,  tim4-1,  tim5/)
-  end_time = tim5
-  
-  do i=0,4
-    Qsac_prv_BW(i) =  ( 0.4 < Qsac_prv_V(i) .and. Qsac_prv_V(i) < 0.6 )
-  enddo
-
-  counter=0
-    
-  do i=0,4
-    if (.not. Qsac_prv_BW(i)) then
-      counter = 0
-      Qsac(tim_beg(i):tim_end(i))=Qsac_prv_V(i) 
-    else if (counter < 0.5) then
-      counter = 1
-      Qsac(tim_beg(i):end_time)=T(1:end_time-tim_beg(i)+1)
-    end if  
-  enddo
-!! endchange  
-  !end of add
+  Qsac(tim0:(tim1-1))=Qsac_prv0
+  Qsac(tim1:(tim2-1))=Qsac_prv1
+  Qsac(tim2:(tim3-1))=Qsac_prv2
+  Qsac(tim3:(tim4-1))=Qsac_prv3
+  Qsac(tim4:tim5)=Qsac_prv4
   
   !start of add 2/15/2005
   SFtideEndIndex= getSFtideArrayEndIndex(mon4,currMonth,currYear)
@@ -204,15 +158,6 @@ FUNCTION ANNX2_curMonInpSplit( &
   REAL,INTENT(IN)    ::  &
      Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qsac_prv4,&
      Qexp_prv0,Qexp_prv1,Qexp_prv2,Qexp_prv3,Qexp_prv4,Qexp_prv4_1,Qexp_prv4_2
-  
-  !!beginchange
-  logical,dimension(0:4) :: Qsac_prv_BW =.false.
-  real   ,dimension(0:4) :: Qsac_prv_V=0
-  integer,dimension(210) :: T=0
-  integer,dimension(0:4) :: tim_beg, tim_end
-  integer :: counter=0, end_time, j
-!!endchange
-  
   
   integer, INTENT(IN) :: currMonth, currYear ! 2/14/2005
   integer, optional, intent(in) :: BeginDay, EndDay !only used in ave_type ==10
@@ -288,49 +233,11 @@ FUNCTION ANNX2_curMonInpSplit( &
   tim1=tim2-mon0               ! 3 months ago from tim4
   tim0=1                       ! 147 day before tim5
   
-!  Qsac(tim0:(tim1-1))=Qsac_prv0
-!  Qsac(tim1:(tim2-1))=Qsac_prv1
-!  Qsac(tim2:(tim3-1))=Qsac_prv2
-!  Qsac(tim3:(tim4-1))=Qsac_prv3
-!  Qsac(tim4:tim5)=Qsac_prv4
-  
- !! begin change - SMSCG update for 7 day op, 7 day open for contineously for 2 or more months with 0.5 output from CS3
-
-  T(1:210)=0
-  end_time = tim5
-  do j = 1, 30
-   do i = 1, 7
-    if ( MOD(j,2)== 0 )  then 
-        T(i+(j-1)*7)=1 
-    endif
-   enddo
-  enddo
-  Qsac_prv_V(0) = Qsac_prv0
-  Qsac_prv_V(1) = Qsac_prv1
-  Qsac_prv_V(2) = Qsac_prv2
-  Qsac_prv_V(3) = Qsac_prv3
-  Qsac_prv_V(4) = Qsac_prv4
-  tim_beg = (/tim0,    tim1,    tim2,    tim3,    tim4/)
-  tim_end = (/tim1-1,  tim2-1,  tim3-1,  tim4-1,  tim5/)
-  end_time = tim5
-  
-  do i=0,4
-    Qsac_prv_BW(i) =  ( 0.4 < Qsac_prv_V(i) .and. Qsac_prv_V(i) < 0.6 )
-  enddo
-
-  counter=0
-    
-  do i=0,4
-    if (.not. Qsac_prv_BW(i)) then
-      counter = 0
-      Qsac(tim_beg(i):tim_end(i))=Qsac_prv_V(i) 
-    else if (counter < 0.5) then
-      counter = 1
-      Qsac(tim_beg(i):end_time)=T(1:end_time-tim_beg(i)+1)
-    end if  
-  enddo
-!! endchange  
-  !end of add
+  Qsac(tim0:(tim1-1))=Qsac_prv0
+  Qsac(tim1:(tim2-1))=Qsac_prv1
+  Qsac(tim2:(tim3-1))=Qsac_prv2
+  Qsac(tim3:(tim4-1))=Qsac_prv3
+  Qsac(tim4:tim5)=Qsac_prv4
     
   !start of add 2/15/2005
   SFtideEndIndex= getSFtideArrayEndIndex(mon4,currMonth,currYear)
@@ -385,14 +292,6 @@ FUNCTION AnnX2_matchDSM2(&
   REAL,INTENT(IN)  :: &
        Qsac_prv0,Qsac_prv1,Qsac_prv2,Qsac_prv3,Qsac_prv4,&
        Qexp_prv0,Qexp_prv1,Qexp_prv2,Qexp_prv3,Qexp_prv4      
-    !!beginchange
-  logical,dimension(0:4) :: Qsac_prv_BW =.false.
-  real   ,dimension(0:4) :: Qsac_prv_V=0
-  integer,dimension(210) :: T=0
-  integer,dimension(0:4) :: tim_beg, tim_end
-  integer :: counter=0, end_time, j
-!!endchange
-  
   
   integer, INTENT(IN) :: currMonth, currYear ! 2/14/2005
   integer, optional, intent(in) :: BeginDay, EndDay !only used in ave_type ==10
@@ -450,49 +349,11 @@ FUNCTION AnnX2_matchDSM2(&
   tim1=tim2-mon0               ! 3 months ago from tim4
   tim0=1                       ! 147 day before tim5
   
-!  Qsac(tim0:(tim1-1))=Qsac_prv0
-!  Qsac(tim1:(tim2-1))=Qsac_prv1
-!  Qsac(tim2:(tim3-1))=Qsac_prv2
-!  Qsac(tim3:(tim4-1))=Qsac_prv3
-!  Qsac(tim4:tim5)=Qsac_prv4  
-  
-    !! beginchange
-
-  T(1:210)=0
-  end_time = tim5
-  do j = 1, 30
-   do i = 1, 7
-    if ( MOD(j,2)== 0 )  then 
-        T(i+(j-1)*7)=1 
-    endif
-   enddo
-  enddo
-  Qsac_prv_V(0) = Qsac_prv0
-  Qsac_prv_V(1) = Qsac_prv1
-  Qsac_prv_V(2) = Qsac_prv2
-  Qsac_prv_V(3) = Qsac_prv3
-  Qsac_prv_V(4) = Qsac_prv4
-  tim_beg = (/tim0,    tim1,    tim2,    tim3,    tim4/)
-  tim_end = (/tim1-1,  tim2-1,  tim3-1,  tim4-1,  tim5/)
-  end_time = tim5
-  
-  do i=0,4
-    Qsac_prv_BW(i) =  ( 0.4 < Qsac_prv_V(i) .and. Qsac_prv_V(i) < 0.6 )
-  enddo
-
-  counter=0
-    
-  do i=0,4
-    if (.not. Qsac_prv_BW(i)) then
-      counter = 0
-      Qsac(tim_beg(i):tim_end(i))=Qsac_prv_V(i) 
-    else if (counter < 0.5) then
-      counter = 1
-      Qsac(tim_beg(i):end_time)=T(1:end_time-tim_beg(i)+1)
-    end if  
-  enddo
-!! endchange  
-  !end of add
+  Qsac(tim0:(tim1-1))=Qsac_prv0
+  Qsac(tim1:(tim2-1))=Qsac_prv1
+  Qsac(tim2:(tim3-1))=Qsac_prv2
+  Qsac(tim3:(tim4-1))=Qsac_prv3
+  Qsac(tim4:tim5)=Qsac_prv4  
   
   !start of add 2/15/2005
   SFtideEndIndex= getSFtideArrayEndIndex(mon5,currMonth,currYear)! 4/17/2005 revised to change "mon4" to "mon5"
